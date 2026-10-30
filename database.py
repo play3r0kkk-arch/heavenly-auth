@@ -30,7 +30,6 @@ def init_db():
     );
     """)
 
-    # Миграция: добавляем is_banned, если колонка отсутствует в существующей БД
     try:
         cursor.execute("ALTER TABLE users ADD COLUMN is_banned INTEGER DEFAULT 0")
     except Exception:
@@ -46,17 +45,15 @@ def init_db():
     );
     """)
 
-    # Создаем дефолтного владельца с UID 1, если база пустая
     cursor.execute("SELECT id FROM users WHERE LOWER(username) = 'heavenlyowner'")
-owner = cursor.fetchone()
-if not owner:
-    cursor.execute("""
-    INSERT OR IGNORE INTO users (id, username, password_hash, hwid, sub_until, role)
+    owner = cursor.fetchone()
+    if not owner:
+        cursor.execute("""
+        INSERT OR IGNORE INTO users (id, username, password_hash, hwid, sub_until, role)
         VALUES (1, 'HeavenlyOwner', ?, '', 'LIFETIME', 'Owner')
         """, (hash_password("admin123"),))
         print("[DB] Создан аккаунт владельца с UID 1: логин 'HeavenlyOwner', пароль 'admin123'")
 
-    # Создаем несколько тестовых ключей подписки
     sample_keys = [
         ("HV-LIFE-TIME-2026", 9999),
         ("HV-30DAY-PASS-0001", 30),
@@ -66,5 +63,7 @@ if not owner:
     for key, days in sample_keys:
         cursor.execute("INSERT OR IGNORE INTO activation_keys (key, days) VALUES (?, ?)", (key, days))
 
+    conn.commit()
+    conn.close()
     conn.commit()
     conn.close()
