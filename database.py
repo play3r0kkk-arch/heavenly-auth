@@ -47,11 +47,11 @@ def init_db():
     """)
 
     # Создаем дефолтного владельца с UID 1, если база пустая
-    cursor.execute("SELECT id FROM users WHERE id = 1")
-    owner = cursor.fetchone()
-    if not owner:
-        cursor.execute("""
-        INSERT INTO users (id, username, password_hash, hwid, sub_until, role)
+    cursor.execute("SELECT id FROM users WHERE LOWER(username) = 'heavenlyowner'")
+owner = cursor.fetchone()
+if not owner:
+    cursor.execute("""
+    INSERT OR IGNORE INTO users (id, username, password_hash, hwid, sub_until, role)
         VALUES (1, 'HeavenlyOwner', ?, '', 'LIFETIME', 'Owner')
         """, (hash_password("admin123"),))
         print("[DB] Создан аккаунт владельца с UID 1: логин 'HeavenlyOwner', пароль 'admin123'")
