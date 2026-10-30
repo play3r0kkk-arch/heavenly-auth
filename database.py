@@ -47,11 +47,18 @@ def init_db():
     """)
 
     # Создаем дефолтного владельца с UID 1, если база пустая
-    cursor.execute("SELECT id FROM users WHERE id = 1")
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT DEFAULT ''
+    );
+    """)
+
+    cursor.execute("SELECT id FROM users WHERE LOWER(username) = 'heavenlyowner'")
     owner = cursor.fetchone()
     if not owner:
         cursor.execute("""
-        INSERT INTO users (id, username, password_hash, hwid, sub_until, role)
+        INSERT OR IGNORE INTO users (id, username, password_hash, hwid, sub_until, role)
         VALUES (1, 'HeavenlyOwner', ?, '', 'LIFETIME', 'Owner')
         """, (hash_password("admin123"),))
         print("[DB] Создан аккаунт владельца с UID 1: логин 'HeavenlyOwner', пароль 'admin123'")
@@ -66,5 +73,20 @@ def init_db():
     for key, days in sample_keys:
         cursor.execute("INSERT OR IGNORE INTO activation_keys (key, days) VALUES (?, ?)", (key, days))
 
+    conn.commit()
+    conn.close()
+
+def get_setting(key: str, default: str = "") -> str:
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT value FROM settings WHERE key = ?", (key,))
+    row = cursor.fetchone()
+    conn.close()
+    return row["value"] if row else default
+
+def set_setting(key: str, value: str):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?", (key, value, value))
     conn.commit()
     conn.close()

@@ -1,9 +1,10 @@
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 import secrets
+import os
 import database
 
 app = FastAPI(
@@ -70,6 +71,33 @@ class DeleteKeyRequest(BaseModel):
 class SetUidRequest(BaseModel):
     username: str
     new_uid: int
+
+class SetClientUrlRequest(BaseModel):
+    download_url: str
+
+@app.get("/api/client/config")
+def get_client_config():
+    url = database.get_setting("client_download_url", "")
+    version = database.get_setting("client_version", "1.0.0")
+    return {
+        "status": "ok",
+        "download_url": url,
+        "version": version
+    }
+
+@app.get("/api/client/manifest")
+def get_client_manifest():
+    manifest_file = os.path.join(os.path.dirname(__file__), "version_manifest.json")
+    if os.path.exists(manifest_file):
+        with open(manifest_file, "r", encoding="utf-8") as f:
+            return Response(content=f.read(), media_type="application/json")
+    return {"status": "error", "message": "Manifest template not found"}
+
+@app.post("/api/admin/set_client_url")
+def set_client_url(req: SetClientUrlRequest):
+    url = req.download_url.strip()
+    database.set_setting("client_download_url", url)
+    return {"status": "ok", "message": "Ссылка на клиент успешно сохранена!", "download_url": url}
 
 @app.get("/")
 def root():
@@ -550,6 +578,21 @@ def admin_page():
             </div>
         </div>
 
+        <!-- Облачное автоскачивание клиента -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">📦 Облачное автоскачивание клиента (Option A)</div>
+            </div>
+            <div style="font-size: 13px; color: #8e8ea0; margin-bottom: 12px; line-height: 1.5;">
+                Укажи прямую ссылку на скачивание <code>HeavenlyClient.jar</code> (например, GitHub Release, Catbox, Google Диск или другой хостинг). Когда другой игрок нажимает <b>«ЗАПУСТИТЬ КЛИЕНТ»</b>, лоадер сам скачает и установит чит!
+            </div>
+            <div class="gen-form">
+                <input type="text" id="clientDownloadUrl" placeholder="https://github.com/.../releases/download/.../HeavenlyClient.jar" style="flex: 1;">
+                <button class="btn" onclick="saveClientDownloadUrl()">💾 Сохранить ссылку</button>
+            </div>
+            <div id="clientUrlStatus" style="font-size: 13px; margin-top: 10px; color: #52e185; display: none;"></div>
+        </div>
+
         <!-- Таблица пользователей -->
         <div class="card">
             <div class="card-header">
@@ -609,6 +652,14 @@ def admin_page():
                 document.getElementById('statKeys').innerText = resKeys.length;
                 const freeCount = resKeys.filter(k => k.is_used === 0).length;
                 document.getElementById('statFreeKeys').innerText = freeCount;
+
+                // Загружаем текущую ссылку на клиент
+                try {
+                    const cfg = await fetch('/api/client/config').then(r => r.json());
+                    if (cfg && cfg.download_url) {
+                        document.getElementById('clientDownloadUrl').value = cfg.download_url;
+                    }
+                } catch (e) {}
 
                 // Пользователи
                 const uTbody = document.getElementById('usersTable');
@@ -786,6 +837,19 @@ def admin_page():
             }).then(r => r.json());
             alert(res.message);
             loadAll();
+        }
+
+        async function saveClientDownloadUrl() {
+            const url = document.getElementById('clientDownloadUrl').value.trim();
+            const res = await fetch('/api/admin/set_client_url', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ download_url: url })
+            }).then(r => r.json());
+            const st = document.getElementById('clientUrlStatus');
+            st.style.display = 'block';
+            st.innerText = res.message || 'Ссылка успешно сохранена!';
+            setTimeout(() => { st.style.display = 'none'; }, 4000);
         }
 
         async function deleteActivationKey(key) {
