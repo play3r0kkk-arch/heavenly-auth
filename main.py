@@ -237,7 +237,9 @@ def register(req: RegisterRequest):
     VALUES (?, ?, ?, ?, 'User')
     """, (username, database.hash_password(password), hwid, sub_until))
 
-    new_uid = cursor.lastrowid
+    cursor.execute("SELECT id FROM users WHERE username = ?", (username,))
+    u_row = cursor.fetchone()
+    new_uid = u_row["id"] if u_row else (cursor.lastrowid or 1)
     cursor.execute("UPDATE activation_keys SET is_used = 1, used_by = ? WHERE key = ?", (username, key_str))
     conn.commit()
     conn.close()

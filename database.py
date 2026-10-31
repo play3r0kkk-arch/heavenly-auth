@@ -19,6 +19,7 @@ if IS_POSTGRES:
     class PostgresCursorWrapper:
         def __init__(self, cursor):
             self._cursor = cursor
+            self._lastrowid = None
 
         def execute(self, query, params=None):
             pg_query = query.replace("?", "%s")
@@ -46,6 +47,10 @@ if IS_POSTGRES:
         def fetchall(self):
             rows = self._cursor.fetchall()
             return [dict(r) for r in rows]
+
+        @property
+        def lastrowid(self):
+            return self._lastrowid
 
         @property
         def rowcount(self):
@@ -89,7 +94,7 @@ def init_db():
     if IS_POSTGRES:
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY,
+            id SERIAL PRIMARY KEY,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             hwid TEXT DEFAULT '',
@@ -114,6 +119,11 @@ def init_db():
             value TEXT DEFAULT ''
         );
         """)
+        try:
+            cursor.execute("CREATE SEQUENCE IF NOT EXISTS users_id_seq OWNED BY users.id;")
+            cursor.execute("ALTER TABLE users ALTER COLUMN id SET DEFAULT nextval('users_id_seq');")
+        except Exception:
+            pass
         cursor.execute("SELECT id FROM users WHERE LOWER(username) = 'heavenlyowner'")
         owner = cursor.fetchone()
         if not owner:
