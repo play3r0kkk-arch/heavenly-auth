@@ -1450,9 +1450,13 @@ def admin_page():
         <div class="card">
 
             <div class="card-header">
-
                 <div class="card-title">🔑 Ключи активации</div>
-
+                <div style="display:flex; align-items:center; gap:16px;">
+                    <label style="font-size:13px; color:#88889c; cursor:pointer; display:flex; align-items:center; gap:6px; user-select:none;">
+                        <input type="checkbox" id="showUsedKeys" onchange="renderKeysTable()" /> Показать использованные
+                    </label>
+                    <button class="btn btn-sm btn-copy" onclick="loadAll()">↻ Обновить</button>
+                </div>
             </div>
 
             <table>
@@ -1622,6 +1626,33 @@ def admin_page():
         }
 
 
+        
+        let globalKeys = [];
+
+        function renderKeysTable() {
+            const showUsed = document.getElementById('showUsedKeys') && document.getElementById('showUsedKeys').checked;
+            const keysToDisplay = (globalKeys || []).filter(k => showUsed ? true : k.is_used === 0);
+            const kTbody = document.getElementById('keysTable');
+            if (!keysToDisplay || keysToDisplay.length === 0) {
+                kTbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:22px; color:#888;">${showUsed ? 'Ключей нет' : 'Нет активных (неиспользованных) ключей'}</td></tr>`;
+                return;
+            }
+            kTbody.innerHTML = keysToDisplay.map(k => {
+                const isUsed = k.is_used === 1;
+                const statusTag = isUsed ? '<span class="tag tag-used">Использован</span>' : '<span class="tag tag-free">Свободен</span>';
+                const daysText = k.days >= 9999 ? 'Навсегда' : k.days + ' дн.';
+                const usedBy = k.used_by ? '<b>' + k.used_by + '</b>' : '<span style="color:#666;">—</span>';
+                return `<tr>
+                    <td><span class="key-text">${k.key}</span> <button class="btn btn-sm btn-copy" style="margin-left:6px;" onclick="navigator.clipboard.writeText('${k.key}'); alert('Ключ скопирован: ${k.key}');">📋</button></td>
+                    <td>${daysText}</td>
+                    <td>${statusTag}</td>
+                    <td>${usedBy}</td>
+                    <td style="color:#888; font-size:12px;">${k.created_at || '—'}</td>
+                    <td><button class="btn-del" title="Удалить ключ" onclick="deleteActivationKey('${k.key}')">🗑️ Удалить</button></td>
+                </tr>`;
+            }).join('');
+        }
+
         async function loadAll() {
 
             try {
@@ -1765,44 +1796,8 @@ def admin_page():
 
 
                 // Ключи
-
-                const kTbody = document.getElementById('keysTable');
-
-                if (resKeys.length === 0) {
-
-                    kTbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Ключей нет</td></tr>';
-
-                } else {
-
-                    kTbody.innerHTML = resKeys.map(k => {
-
-                        const isUsed = k.is_used === 1;
-
-                        const statusTag = isUsed ? '<span class="tag tag-used">Использован</span>' : '<span class="tag tag-free">Свободен</span>';
-
-                        const daysText = k.days >= 9999 ? 'Навсегда' : k.days + ' дн.';
-
-                        const usedBy = k.used_by ? '<b>' + k.used_by + '</b>' : '<span style="color:#666;">—</span>';
-
-                        return `<tr>
-
-                            <td><span class="key-text">${k.key}</span> <button class="btn btn-sm btn-copy" style="margin-left:6px;" onclick="navigator.clipboard.writeText('${k.key}'); alert('Ключ скопирован: ${k.key}');">📋</button></td>
-
-                            <td>${daysText}</td>
-
-                            <td>${statusTag}</td>
-
-                            <td>${usedBy}</td>
-
-                            <td style="color:#888; font-size:12px;">${k.created_at || '—'}</td>
-
-                            <td><button class="btn-del" title="Удалить ключ" onclick="deleteActivationKey('${k.key}')">🗑️ Удалить</button></td>
-
-                        </tr>`;
-
-                    }).join('');
-
-                }
+                globalKeys = resKeys;
+                renderKeysTable();
 
 
 
